@@ -20,7 +20,7 @@
 
   logger.info("Chat container created");
 
-  // Add enhanced styles with animations
+  // Add enhanced styles with animations and additional rules for images
   const style = document.createElement("style");
   style.innerHTML = `
     /* General Reset */
@@ -59,6 +59,17 @@
       bottom: 80px;
       right: 0;
       box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+    }
+
+    /* Media Query for Mobile */
+    @media (max-width: 480px) {
+      #my-chat-window {
+        width: 90vw;
+        height: 90vh;
+        bottom: 5vh;
+        right: 5vw;
+        border-radius: 12px;
+      }
     }
 
     /* Show/Hide Animations */
@@ -237,11 +248,60 @@
       50% { transform: scale(1.1); background: #ff6b81; }
       100% { transform: scale(1); background: #ff4757; }
     }
+
+    /* Additional styling for product and action messages */
+    .product-card {
+      border: 1px solid #e1e1e1;
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      background: #fff;
+      width: 100%;
+    }
+
+    .product-card img {
+      width: 100%;
+      object-fit: cover;
+    }
+
+    .product-details {
+      padding: 12px;
+    }
+
+    .product-actions {
+      display: flex;
+      gap: 8px;
+      padding: 12px;
+      justify-content: flex-end;
+    }
+
+    .action-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .action-button, .product-action-button {
+      background: #6c5ce7;
+      color: white;
+      border: none;
+      border-radius: 20px;
+      padding: 8px 12px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      font-size: 12px;
+    }
+
+    .action-button:hover, .product-action-button:hover {
+      background: #5b4cc4;
+    }
   `;
   document.head.appendChild(style);
   logger.info("Styles added");
 
-  // Create button with SVG icon
+  // Create chat toggle button with SVG icon
   const chatButton = document.createElement("button");
   chatButton.className = "chat-toggle";
   chatButton.innerHTML = `
@@ -258,8 +318,12 @@
 
   logger.info("Chat button and window created");
 
-  // Improved chat window visibility toggle
+  // Toggle chat window visibility
   let isOpen = false;
+
+  function isMobile() {
+    return window.innerWidth < 768;
+  }
 
   function toggleChat() {
     logger.info("Toggling chat window, current state:", isOpen);
@@ -269,15 +333,22 @@
       chatWindow.classList.add("chat-show");
       chatWindow.classList.remove("chat-hide");
       isOpen = true;
+
+      if (isMobile()) {
+        document.body.style.overflow = "hidden"; // Prevent background scrolling
+      }
+
       loadChatInterface();
     } else {
       chatWindow.classList.remove("chat-show");
       chatWindow.classList.add("chat-hide");
+
       chatWindow.addEventListener(
         "animationend",
         () => {
           chatWindow.style.display = "none";
           isOpen = false;
+          document.body.style.overflow = ""; // Restore scrolling
         },
         { once: true },
       );
@@ -286,10 +357,9 @@
 
   chatButton.addEventListener("click", toggleChat);
 
-  // Enhanced chat interface loading
+  // Function to load the chat interface from the backend
   function loadChatInterface() {
     logger.info("Loading chat interface...");
-
     fetch("http://localhost:3000/api/chat/init", {
       method: "GET",
       credentials: "include",
@@ -309,11 +379,7 @@
               </svg>
             </button>
           </div>
-          <div id="chat-body">
-            <div class="message server-message">
-              <div class="message-content">${data.initialContent || "Hi! How can I help you today?"}</div>
-            </div>
-          </div>
+          <div id="chat-body"></div>
           <div id="chat-footer">
             <input type="text" id="chat-input" placeholder="Type a message..." />
             <button id="voice-button" title="Voice Input">
@@ -333,13 +399,25 @@
           </div>
         `;
 
-        // Add close button functionality
+        // Close button functionality
         const closeButton = chatWindow.querySelector(".close-button");
         closeButton.addEventListener("click", (e) => {
           e.stopPropagation();
           toggleChat();
         });
 
+        // Render initial messages if provided
+        if (data.messages && Array.isArray(data.messages)) {
+          data.messages.forEach((msg) => {
+            appendServerMessage(msg);
+          });
+        } else {
+          // Fallback welcome text if no messages were returned
+          appendServerMessage({
+            type: "text",
+            content: "Hi! How can I help you today?",
+          });
+        }
         setupChatMessaging();
         logger.info("Chat interface loaded and initialized");
       })
@@ -358,7 +436,123 @@
       });
   }
 
-  // Enhanced chat messaging setup
+  // Helper function to render server messages based on type
+  function appendServerMessage(msg) {
+    const chatBody = document.getElementById("chat-body");
+    const messageDiv = document.createElement("div");
+    messageDiv.className = "message server-message";
+
+    // Mobile-optimized message rendering
+    switch (msg.type) {
+      case "text":
+        messageDiv.innerHTML = `
+            <div class="message-content">
+              ${msg.content}
+            </div>
+          `;
+        break;
+      case "product":
+        messageDiv.innerHTML = `
+            <div class="product-card">
+              <img src="${msg.imageUrl}" alt="${msg.title}" loading="lazy" />
+              <div class="product-details">
+                <h4 style="margin: 8px 0; font-size: 16px;">${msg.title}</h4>
+                <p style="margin: 8px 0; color: #666;">${msg.description}</p>
+                <strong style="display: block; margin: 8px 0; font-size: 18px; color: #6c5ce7;">
+                  $${msg.price.toFixed(2)}
+                </strong>
+              </div>
+              <div class="action-buttons" style="padding: 8px;">
+                ${msg.actions
+                  .map(
+                    (action) => `
+                  <button class="product-action-button" data-action="${action.value}">
+                    ${action.label}
+                  </button>
+                `,
+                  )
+                  .join("")}
+              </div>
+            </div>
+          `;
+        break;
+      case "action":
+        messageDiv.innerHTML = `
+          <div class="message-content">
+            <p>${msg.question}</p>
+            <div class="action-buttons">
+              ${msg.options
+                .map(
+                  (option) =>
+                    `<button class="action-button" data-action="${option.value}">${option.label}</button>`,
+                )
+                .join("")}
+            </div>
+          </div>
+        `;
+        break;
+      case "image":
+        messageDiv.innerHTML = `
+          <div class="message-content">
+            <img src="${msg.imageUrl}" alt="Image message" style="max-width:100%; border-radius:8px;" />
+            ${msg.caption ? `<p>${msg.caption}</p>` : ""}
+          </div>
+        `;
+        break;
+      default:
+        messageDiv.innerHTML = `<div class="message-content">Unknown message type.</div>`;
+    }
+    chatBody.appendChild(messageDiv);
+    chatBody.scrollTop = chatBody.scrollHeight;
+
+    // Set up click events on any action or product buttons within this message
+    const actionButtons = messageDiv.querySelectorAll(
+      ".action-button, .product-action-button",
+    );
+    actionButtons.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const actionValue = btn.getAttribute("data-action");
+        logger.info("Action button clicked:", actionValue);
+        sendMessageToServer({ action: actionValue });
+      });
+    });
+  }
+
+  // Move sendMessageToServer to the outer scope so it's accessible everywhere
+  function sendMessageToServer(payload) {
+    logger.info("Sending message payload to server:", payload);
+    fetch("http://localhost:3000/api/chat/message", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+      .then((response) => {
+        logger.info("Server response received");
+        return response.json();
+      })
+      .then((data) => {
+        logger.info("Processing server response:", data);
+        const chatBody = document.getElementById("chat-body");
+        if (data.messages && Array.isArray(data.messages)) {
+          data.messages.forEach((msg) => {
+            appendServerMessage(msg);
+          });
+        }
+        chatBody.scrollTop = chatBody.scrollHeight;
+      })
+      .catch((err) => {
+        logger.error("Error in server communication:", err);
+        const chatBody = document.getElementById("chat-body");
+        appendServerMessage({
+          type: "text",
+          content: "Sorry, I couldn't process your message. Please try again.",
+        });
+        chatBody.scrollTop = chatBody.scrollHeight;
+      });
+  }
+
+  // Setup chat messaging interactions
   function setupChatMessaging() {
     const sendButton = document.getElementById("send-message");
     const voiceButton = document.getElementById("voice-button");
@@ -370,47 +564,33 @@
     let isRecording = false;
     let recognition = null;
 
-    // Input validation and sanitization
+    // Sanitize input to prevent injection attacks
     function sanitizeInput(input) {
       return input.replace(/[<>]/g, "").trim();
     }
 
-    // Improved message handling
+    // Handle sending user messages
     function handleMessageSend() {
       const message = sanitizeInput(chatInput.value);
       if (message === "") return;
-
       logger.info("Sending message:", message);
-
       appendUserMessage(message);
       chatInput.value = "";
       chatBody.scrollTop = chatBody.scrollHeight;
-
-      sendMessageToServer(message);
+      sendMessageToServer({ message });
     }
 
-    // Message rendering functions
+    // Append user message to chat
     function appendUserMessage(message) {
       const messageDiv = document.createElement("div");
       messageDiv.className = "message user-message";
       messageDiv.innerHTML = `<div class="message-content">${message}</div>`;
       chatBody.appendChild(messageDiv);
-
       logger.info("User message appended to chat");
     }
 
-    function appendServerMessage(message) {
-      const messageDiv = document.createElement("div");
-      messageDiv.className = "message server-message";
-      messageDiv.innerHTML = `<div class="message-content">${message}</div>`;
-      chatBody.appendChild(messageDiv);
-
-      logger.info("Server message appended to chat");
-    }
-
-    // Event listeners
+    // Event listeners for send button and Enter key
     sendButton.addEventListener("click", handleMessageSend);
-
     chatInput.addEventListener("keyup", function (event) {
       if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
@@ -418,7 +598,7 @@
       }
     });
 
-    // Enhanced voice recognition
+    // Voice recognition setup
     voiceButton.addEventListener("click", function () {
       if (
         !("webkitSpeechRecognition" in window) &&
@@ -428,63 +608,44 @@
         alert("Voice recognition is not supported in your browser.");
         return;
       }
-
       if (isRecording) {
         logger.info("Stopping voice recording");
-        if (recognition) {
-          recognition.stop();
-        }
+        if (recognition) recognition.stop();
         return;
       }
-
-      // Initialize speech recognition
       const SpeechRecognition =
         window.SpeechRecognition || window.webkitSpeechRecognition;
       recognition = new SpeechRecognition();
-
-      // Configure recognition settings
       recognition.continuous = false;
       recognition.interimResults = true;
       recognition.lang = "en-US";
-
-      // Handle recognition start
       recognition.onstart = () => {
         logger.info("Voice recognition started");
         isRecording = true;
         voiceButton.classList.add("recording");
       };
-
-      // Handle recognition end
       recognition.onend = () => {
         logger.info("Voice recognition ended");
         isRecording = false;
         voiceButton.classList.remove("recording");
         recognition = null;
       };
-
-      // Handle recognition errors
       recognition.onerror = (event) => {
         logger.error("Voice recognition error:", event.error);
         isRecording = false;
         voiceButton.classList.remove("recording");
         recognition = null;
       };
-
-      // Handle recognition results
       recognition.onresult = (event) => {
         const transcript = Array.from(event.results)
           .map((result) => result[0].transcript)
           .join("");
-
         logger.info("Voice recognition result:", transcript);
         chatInput.value = transcript;
-
         if (event.results[0].isFinal) {
           handleMessageSend();
         }
       };
-
-      // Start recognition
       try {
         recognition.start();
         logger.info("Attempting to start voice recognition");
@@ -494,37 +655,6 @@
       }
     });
 
-    // Server communication
-    function sendMessageToServer(message) {
-      logger.info("Sending message to server:", message);
-
-      fetch("http://localhost:3000/api/chat/message", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ message }),
-      })
-        .then((response) => {
-          logger.info("Server response received");
-          return response.json();
-        })
-        .then((data) => {
-          logger.info("Processing server response:", data);
-          appendServerMessage(data.response);
-          chatBody.scrollTop = chatBody.scrollHeight;
-        })
-        .catch((err) => {
-          logger.error("Error in server communication:", err);
-          appendServerMessage(
-            "Sorry, I couldn't process your message. Please try again.",
-          );
-          chatBody.scrollTop = chatBody.scrollHeight;
-        });
-    }
-
-    // Initial focus on input
     chatInput.focus();
     logger.info("Chat messaging setup completed");
   }
