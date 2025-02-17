@@ -31,46 +31,64 @@
 
     /* Chat Toggle Button */
     #my-chat-widget button.chat-toggle {
-      background: #6c5ce7;
-      color: white;
-      border: none;
-      border-radius: 50%;
-      width: 56px;
-      height: 56px;
-      font-size: 24px;
-      cursor: pointer;
-      box-shadow: 0 4px 12px rgba(108, 92, 231, 0.4);
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 10001;
+        background: #6c5ce7;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        /* Increased size range:
+           - Minimum size increased to 70px for better mobile touch targets
+           - Maximum size increased to 120px for better visibility
+           - Base size increased to 15vw for more prominent presence */
+        width: min(max(70px, 15vw), 120px);
+        height: min(max(70px, 15vw), 120px);
+        /* Larger font size for better visibility:
+           - Minimum increased to 28px
+           - Maximum increased to 40px */
+        font-size: min(max(28px, 4vw), 40px);
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(108, 92, 231, 0.4);
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10001;
     }
 
     /* Chat Window */
     #my-chat-window {
-      display: none;
-      width: 380px;
-      height: 600px;
-      background: #ffffff;
-      border-radius: 24px;
-      overflow: hidden;
-      position: absolute;
-      bottom: 80px;
-      right: 0;
-      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+        display: none;
+        /* Increased width range:
+           - Maximum width increased to 800px for desktop
+           - Mobile width uses nearly full viewport */
+        width: min(800px, calc(100vw - 20px));
+        /* Increased height:
+           - Maximum height increased to 900px
+           - Uses 90vh for better screen coverage
+           - Maintains small gap at bottom */
+        height: min(900px, calc(90vh - 10px));
+        background: #ffffff;
+        border-radius: 24px;
+        overflow: hidden;
+        position: fixed;
+        /* Adjusted positioning for larger size */
+        right: 10px;
+        bottom: 140px; /* Increased to accommodate larger toggle button */
+        /* Center horizontally on mobile */
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 10002;
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
     }
 
-    /* Media Query for Mobile */
-    @media (max-width: 480px) {
-      #my-chat-window {
-        width: 90vw;
-        height: 90vh;
-        bottom: 5vh;
-        right: 5vw;
-        border-radius: 12px;
-      }
+    /* Desktop enhancement for positioning */
+    @media (min-width: 1024px) { /* Increased breakpoint for larger screens */
+        #my-chat-window {
+            left: auto;
+            transform: none;
+            right: 20px; /* More space on desktop */
+        }
     }
+
 
     /* Show/Hide Animations */
     .chat-show {
