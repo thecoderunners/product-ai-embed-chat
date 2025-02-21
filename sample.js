@@ -1,4 +1,12 @@
 (function () {
+  // Add viewport meta tag if not present
+  if (!document.querySelector('meta[name="viewport"]')) {
+    const viewportMeta = document.createElement('meta');
+    viewportMeta.name = 'viewport';
+    viewportMeta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+    document.head.appendChild(viewportMeta);
+  }
+  
   // Debug logger setup
   const DEBUG = true;
   const logger = {
@@ -59,10 +67,15 @@
 
     @media (max-width: 767px) {
         #my-chat-widget button.chat-toggle {
-            width: clamp(65px, 18vw, 90px);
-            height: clamp(65px, 18vw, 90px);
+            width: 80px;
+            height: 80px;
             right: 0;
             bottom: 0;
+            font-size: 32px;
+            /* Position at bottom right with some padding */
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
         }
     }
 
@@ -85,12 +98,17 @@
     /* Mobile Full Screen Mode */
     @media (max-width: 767px) {
         #my-chat-window {
-            width: 100vw;
-            height: 100vh;
+            width: 100%;
+            height: 100%;
             bottom: 0;
             right: 0;
+            left: 0;
+            top: 0;
             border-radius: 0;
             max-height: none;
+            position: fixed;
+            margin: 0;
+            padding: 0;
         }
         
         #my-chat-window.chat-show {
@@ -153,7 +171,7 @@
     @keyframes slideUpFullScreen {
       from {
         opacity: 0;
-        transform: translateY(50px);
+        transform: translateY(20px);
       }
       to {
         opacity: 1;
@@ -168,7 +186,18 @@
       }
       to {
         opacity: 0;
-        transform: translateY(50px);
+        transform: translateY(20px);
+      }
+    }
+    
+    /* Ensure proper mobile layout */
+    @media (max-width: 767px) {
+      html.chat-open,
+      body.chat-open {
+        overflow: hidden !important;
+        position: fixed;
+        width: 100%;
+        height: 100%;
       }
     }
 
@@ -188,6 +217,11 @@
     @media (max-width: 767px) {
       #chat-header {
         padding: 1rem;
+        position: sticky;
+        top: 0;
+        z-index: 10003;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        font-size: 20px;
       }
     }
 
@@ -224,8 +258,9 @@
     
     @media (max-width: 767px) {
       #chat-body {
-        height: calc(100% - 120px);
-        padding: 0.75rem;
+        height: calc(100vh - 130px); /* Fixed calculation for mobile */
+        padding: 1rem;
+        -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
       }
     }
 
@@ -291,12 +326,20 @@
       left: 0;
       right: 0;
       height: clamp(70px, 10vh, 80px);
+      box-sizing: border-box;
     }
     
     @media (max-width: 767px) {
       #chat-footer {
-        padding: 0.75rem;
-        gap: 0.5rem;
+        padding: 12px;
+        gap: 12px;
+        height: 70px;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
       }
     }
 
@@ -336,6 +379,18 @@
     #chat-footer button svg {
       width: clamp(16px, 5vw, 20px);
       height: clamp(16px, 5vw, 20px);
+    }
+    
+    @media (max-width: 767px) {
+      #chat-footer button {
+        width: 48px;
+        height: 48px;
+      }
+      
+      #chat-footer button svg {
+        width: 24px;
+        height: 24px;
+      }
     }
 
     #chat-footer button:hover {
@@ -501,7 +556,14 @@
       isOpen = true;
 
       if (isMobile()) {
+        document.documentElement.classList.add("chat-open");
+        document.body.classList.add("chat-open");
         document.body.style.overflow = "hidden"; // Prevent background scrolling
+        
+        // Force repaint to ensure full screen on mobile
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+        }, 10);
       }
 
       loadChatInterface();
@@ -514,6 +576,8 @@
         () => {
           chatWindow.style.display = "none";
           isOpen = false;
+          document.documentElement.classList.remove("chat-open");
+          document.body.classList.remove("chat-open");
           document.body.style.overflow = ""; // Restore scrolling
         },
         { once: true },
