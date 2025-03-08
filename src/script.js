@@ -1,3 +1,5 @@
+import './styles.css';
+
 (function () {
   // Add viewport meta tag if not present
   if (!document.querySelector('meta[name="viewport"]')) {
@@ -27,15 +29,6 @@
   document.body.appendChild(chatContainer);
 
   logger.info("Chat container created");
-
-  // Add CSS using link element instead of style element
-  const linkElement = document.createElement('link');
-  linkElement.rel = 'stylesheet';
-  linkElement.href = './styles.css'; // Update with your actual CSS path
-  document.head.appendChild(linkElement);
-
-  linkElement.onload = () => logger.info("CSS file loaded successfully");
-  linkElement.onerror = () => logger.error("Failed to load CSS file");
 
   // Create chat toggle button with SVG icon
   const chatButton = document.createElement("button");
