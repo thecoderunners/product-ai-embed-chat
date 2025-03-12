@@ -1,15 +1,31 @@
-// Import CSS as a raw string using the inline query parameter
-import css from './styles.css?inline';
+// // Import CSS as a raw string using the inline query parameter
+// import css from './styles.css?inline';
 
-// Function to inject the CSS into a <style> tag at runtime
-function injectCSS(cssText) {
-  const style = document.createElement('style');
-  style.textContent = cssText;
-  document.head.appendChild(style);
+// // Function to inject the CSS into a <style> tag at runtime
+// function injectCSS(cssText) {
+//   const style = document.createElement('style');
+//   style.textContent = cssText;
+//   document.head.appendChild(style);
+// }
+
+// // Inject the CSS so that it's applied to the document
+// injectCSS(css);
+
+
+// src/script.js
+if (import.meta.env.PROD) {
+  // In production, import CSS as a raw string and inject it manually.
+  import('./styles.css?inline').then((module) => {
+    const cssText = module.default;
+    const style = document.createElement('style');
+    style.textContent = cssText;
+    document.head.appendChild(style);
+  });
+} else {
+  // In development, import normally so that Vite handles injection (and HMR) for you.
+  import('./styles.css');
 }
 
-// Inject the CSS so that it's applied to the document
-injectCSS(css);
 
 
 (function () {
@@ -322,214 +338,6 @@ injectCSS(css);
     return `$${price.toFixed(2)}`;
   }
 
-  const additionalStyles = `
-  /* Product Card Enhancements */
-  .product-card {
-    border: 1px solid #e1e1e1;
-    border-radius: 16px;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    background: #fff;
-    width: 100%;
-    margin-bottom: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-  }
-  
-  .product-card:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    transform: translateY(-2px);
-  }
-  
-  .product-image-container {
-    position: relative;
-    width: 100%;
-  }
-  
-  .product-card img {
-    width: 100%;
-    height: auto;
-    max-height: 200px;
-    object-fit: cover;
-    border-bottom: 1px solid #f0f0f0;
-  }
-  
-  @media (max-width: 767px) {
-    .product-card img {
-      max-height: 180px;
-    }
-  }
-  
-  .discount-badge {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    background: #e74c3c;
-    color: white;
-    padding: 4px 8px;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: bold;
-  }
-  
-  .product-details {
-    padding: 12px;
-  }
-  
-  .product-details h4 {
-    margin: 0 0 8px 0;
-    font-size: 16px;
-    color: #333;
-  }
-  
-  .product-details p {
-    margin: 8px 0;
-    color: #666;
-    font-size: 14px;
-    line-height: 1.4;
-  }
-  
-  .product-rating {
-    display: flex;
-    align-items: center;
-    margin-bottom: 8px;
-  }
-  
-  .stars {
-    display: inline-flex;
-    margin-right: 6px;
-  }
-  
-  .star {
-    color: #f39c12;
-    font-size: 14px;
-  }
-  
-  .star.empty {
-    color: #e1e1e1;
-  }
-  
-  .star.half {
-    position: relative;
-    color: #e1e1e1;
-  }
-  
-  .star.half:before {
-    content: '★';
-    position: absolute;
-    color: #f39c12;
-    width: 50%;
-    overflow: hidden;
-  }
-  
-  .rating-value {
-    font-size: 14px;
-    color: #666;
-  }
-  
-  .product-price {
-    display: flex;
-    align-items: center;
-    margin: 10px 0;
-  }
-  
-  .product-price strong {
-    font-size: 18px;
-    color: #2ecc71;
-    margin-right: 8px;
-  }
-  
-  .original-price {
-    text-decoration: line-through;
-    color: #999;
-    font-size: 14px;
-  }
-  
-  .shipping-info {
-    font-size: 12px;
-    color: #3498db;
-    margin-top: 4px;
-  }
-  
-  .out-of-stock {
-    display: inline-block;
-    padding: 2px 6px;
-    background: #f1f1f1;
-    color: #e74c3c;
-    font-size: 12px;
-    border-radius: 4px;
-    margin-top: 4px;
-  }
-  
-  .product-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    padding: 8px 12px 16px;
-    justify-content: center;
-  }
-  
-  .product-action-button {
-    background: #6c5ce7;
-    color: white;
-    border: none;
-    border-radius: 20px;
-    padding: 8px 16px;
-    cursor: pointer;
-    transition: background 0.2s ease, transform 0.1s ease;
-    font-size: 14px;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  .product-action-button:hover {
-    background: #5b4cc4;
-    transform: scale(1.05);
-  }
-  
-  .product-action-button:active {
-    transform: scale(0.95);
-  }
-
-  /* Special styling for Buy Now button */
-  .product-action-button[data-action^="buy_"] {
-    background: #2ecc71;
-  }
-  
-  .product-action-button[data-action^="buy_"]:hover {
-    background: #27ae60;
-  }
-  
-  /* Different color for View Details button */
-  .product-action-button[data-action^="details_"] {
-    background: #3498db;
-  }
-  
-  .product-action-button[data-action^="details_"]:hover {
-    background: #2980b9;
-  }
-  
-  @media (max-width: 767px) {
-    .product-actions {
-      flex-direction: column;
-    }
-    
-    .product-action-button {
-      width: 100%;
-    }
-  }
-`;
-
-  function addProductStyles() {
-    const styleElement = document.createElement('style');
-    styleElement.textContent = additionalStyles;
-    document.head.appendChild(styleElement);
-  }
-
-
   // Move sendMessageToServer to the outer scope so it's accessible everywhere
   function sendMessageToServer(payload) {
     logger.info("Sending message payload to server:", payload);
@@ -670,6 +478,5 @@ injectCSS(css);
     chatInput.focus();
     logger.info("Chat messaging setup completed");
   }
-  addProductStyles();
   logger.info("Chat widget initialized");
 })();
