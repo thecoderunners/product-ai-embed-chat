@@ -1,4 +1,16 @@
-import './styles.css';
+// Import CSS as a raw string using the inline query parameter
+import css from './styles.css?inline';
+
+// Function to inject the CSS into a <style> tag at runtime
+function injectCSS(cssText) {
+  const style = document.createElement('style');
+  style.textContent = cssText;
+  document.head.appendChild(style);
+}
+
+// Inject the CSS so that it's applied to the document
+injectCSS(css);
+
 
 (function () {
   // Add viewport meta tag if not present
