@@ -1,4 +1,5 @@
 import { serve } from "bun";
+import { createHmac } from "crypto";
 
 // Define message type interfaces for structured responses
 interface BaseMessage {
@@ -20,13 +21,13 @@ interface ProductMessage extends BaseMessage {
   actions: {
     label: string;
     value: string;
-    url?: string; // URL to direct users to product page
+    url?: string;
   }[];
-  rating?: number; // Optional rating out of 5
-  discount?: number; // Optional discount percentage
-  originalPrice?: number; // Optional original price before discount
-  inStock?: boolean; // Optional stock status
-  shipping?: string; // Optional shipping info
+  rating?: number;
+  discount?: number;
+  originalPrice?: number;
+  inStock?: boolean;
+  shipping?: string;
 }
 
 interface ActionMessage extends BaseMessage {
@@ -42,6 +43,16 @@ interface ImageMessage extends BaseMessage {
   type: "image";
   imageUrl: string;
   caption?: string;
+}
+
+interface ApiResponse {
+  success: boolean;
+  data?: any;
+  error?: string;
+  meta?: {
+    timestamp: number;
+    [key: string]: any;
+  };
 }
 
 type ChatMessage = TextMessage | ProductMessage | ActionMessage | ImageMessage;
@@ -191,6 +202,76 @@ function productToMessage(product: any): ProductMessage {
   };
 }
 
+// Validate the public API key (for token generation)
+// Note: This API key is public and should only have limited permissions.
+function validateApiKey(request: Request): boolean {
+  console.log("Validating API key...");
+  console.log("API Key:", request.headers.get("X-Api-Key"));
+  console.log("Environment:", process.env.NODE_ENV);
+  // In development, skip validation
+  if (process.env.NODE_ENV === "development") return true;
+  const apiKey = request.headers.get("X-Api-Key");
+  return apiKey === process.env.API_KEY;
+}
+
+// --- Token Generation & Validation ---
+
+// Generate a short-lived JWT-like token (valid for 5 minutes)
+function generateShortLivedToken(
+  apiKey: string,
+  expiresInSeconds = 300
+): string {
+  const header = { alg: "HS256", typ: "JWT" };
+  const iat = Math.floor(Date.now() / 1000);
+  const exp = iat + expiresInSeconds;
+  const payload = { apiKey, iat, exp };
+
+  const base64Header = Buffer.from(JSON.stringify(header)).toString(
+    "base64url"
+  );
+  const base64Payload = Buffer.from(JSON.stringify(payload)).toString(
+    "base64url"
+  );
+
+  const signature = createHmac(
+    "sha256",
+    process.env.TOKEN_SECRET || "default_secret"
+  )
+    .update(`${base64Header}.${base64Payload}`)
+    .digest("base64url");
+
+  return `${base64Header}.${base64Payload}.${signature}`;
+}
+
+// Validate the token from the Authorization header
+function validateToken(request: Request): boolean {
+  const authHeader = request.headers.get("Authorization");
+  if (!authHeader) return false;
+  const parts = authHeader.split(" ");
+  if (parts.length !== 2 || parts[0] !== "Bearer") return false;
+  const token = parts[1];
+  const segments = token.split(".");
+  if (segments.length !== 3) return false;
+
+  const [base64Header, base64Payload, signature] = segments;
+  const expectedSignature = createHmac(
+    "sha256",
+    process.env.TOKEN_SECRET || "default_secret"
+  )
+    .update(`${base64Header}.${base64Payload}`)
+    .digest("base64url");
+
+  if (signature !== expectedSignature) return false;
+
+  const payload = JSON.parse(
+    Buffer.from(base64Payload, "base64url").toString("utf8")
+  );
+  if (payload.exp < Math.floor(Date.now() / 1000)) return false;
+
+  return true;
+}
+
+// --- Chat & Product Handling Functions ---
 function handleUserAction(action: string): ChatMessage[] {
   // Handle category selection
   if (action.startsWith("category_")) {
@@ -215,7 +296,6 @@ function handleUserAction(action: string): ChatMessage[] {
       },
     ];
 
-    // Add up to 3 products from the category
     categoryProducts.slice(0, 3).forEach((product) => {
       responses.push(productToMessage(product));
     });
@@ -265,7 +345,6 @@ function handleUserAction(action: string): ChatMessage[] {
       },
     ];
 
-    // Add up to 3 products from the filtered list
     filteredProducts.slice(0, 3).forEach((product) => {
       responses.push(productToMessage(product));
     });
@@ -404,7 +483,7 @@ function getWelcomeMessage(): ChatMessage[] {
       id: generateMessageId(),
       content: "Here's one of our best sellers:",
     },
-    productToMessage(products[0]), // Show the first product as a featured item
+    productToMessage(products[0]),
   ];
 }
 
@@ -429,7 +508,23 @@ function handlePriceRanges(): ChatMessage[] {
   ];
 }
 
-// Server setup with enhanced message handling
+function createApiResponse(
+  success: boolean,
+  data?: any,
+  error?: string
+): ApiResponse {
+  return {
+    success,
+    ...(data && { data }),
+    ...(error && { error }),
+    meta: {
+      timestamp: Date.now(),
+    },
+  };
+}
+
+// --- Server Setup with Enhanced Security ---
+
 const server = serve({
   port: 3000,
   async fetch(request) {
@@ -450,12 +545,48 @@ const server = serve({
       headers.set("Access-Control-Allow-Origin", "*");
     }
     headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    headers.set("Access-Control-Allow-Headers", "Content-Type");
+    headers.set(
+      "Access-Control-Allow-Headers",
+      "Content-Type, Authorization, X-Api-Key"
+    );
     headers.set("Access-Control-Allow-Credentials", "true");
 
     // Handle CORS preflight
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers });
+    }
+
+    // --- Token Generation Endpoint ---
+    // Clients send their public API key here to receive a short-lived token.
+    if (url.pathname === "/api/token" && request.method === "POST") {
+      if (!validateApiKey(request)) {
+        return new Response(
+          JSON.stringify(
+            createApiResponse(false, undefined, "Invalid or missing API key")
+          ),
+          { status: 401, headers }
+        );
+      }
+      const apiKey = request.headers.get("X-Api-Key") as string;
+      const token = generateShortLivedToken(apiKey);
+      return new Response(JSON.stringify(createApiResponse(true, { token })), {
+        status: 200,
+        headers: {
+          ...Object.fromEntries(headers),
+          "Content-Type": "application/json",
+        },
+      });
+    }
+
+    // --- Secure Endpoints: Validate Short-Lived Token ---
+    // For chat endpoints, require the Authorization header with "Bearer <token>"
+    if (!validateToken(request)) {
+      return new Response(
+        JSON.stringify(
+          createApiResponse(false, undefined, "Invalid or expired token")
+        ),
+        { status: 401, headers }
+      );
     }
 
     // Chat initialization endpoint
@@ -481,15 +612,12 @@ const server = serve({
           setTimeout(resolve, Math.random() * 1000 + 500)
         );
 
-        // Handle different types of incoming messages
-        let response;
+        let response: ChatMessage[] = [];
         if (body.action === "show_price_ranges") {
           response = handlePriceRanges();
         } else if (body.action) {
-          // Handle action responses
           response = handleUserAction(body.action);
         } else if (body.message) {
-          // Simple keyword matching for message handling
           const message = body.message.toLowerCase();
 
           if (
@@ -518,7 +646,6 @@ const server = serve({
           ) {
             response = handleUserAction("price_over_200");
           } else {
-            // Default text message response
             response = [
               {
                 type: "text",
@@ -546,7 +673,7 @@ const server = serve({
             "Content-Type": "application/json",
           },
         });
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error processing request:", error);
         return new Response(
           JSON.stringify({
@@ -564,7 +691,7 @@ const server = serve({
       }
     }
 
-    // Handle 404
+    // Fallback 404
     return new Response(JSON.stringify({ error: "Endpoint not found" }), {
       status: 404,
       headers: {

@@ -1,17 +1,3 @@
-// // Import CSS as a raw string using the inline query parameter
-// import css from './styles.css?inline';
-
-// // Function to inject the CSS into a <style> tag at runtime
-// function injectCSS(cssText) {
-//   const style = document.createElement('style');
-//   style.textContent = cssText;
-//   document.head.appendChild(style);
-// }
-
-// // Inject the CSS so that it's applied to the document
-// injectCSS(css);
-
-
 // src/script.js
 if (import.meta.env.PROD) {
   // In production, import CSS as a raw string and inject it manually.
@@ -29,6 +15,37 @@ if (import.meta.env.PROD) {
 
 
 (function () {
+  // Retrieve API key from the script tag
+  // More resilient approach to getting the API key
+  function getApiKey() {
+    // Method 1: Try to get the currently executing script (works in modern browsers)
+    const currentScript = document.currentScript;
+    if (currentScript && currentScript.getAttribute('data-api-key')) {
+      return currentScript.getAttribute('data-api-key');
+    }
+
+    // Method 2: Scan all script tags that might match our widget
+    const scripts = document.querySelectorAll('script[type="module"]');
+    for (const script of scripts) {
+      // Check for both dev and prod paths, or any script with our data attribute
+      if (
+        script.getAttribute('data-api-key') &&
+        (script.src.includes('chat-widget') || script.src.includes('script.js'))
+      ) {
+        return script.getAttribute('data-api-key');
+      }
+    }
+
+    // Method 3: Last resort - check any script with our data attribute
+    const scriptWithKey = document.querySelector('script[data-api-key]');
+    if (scriptWithKey) {
+      return scriptWithKey.getAttribute('data-api-key');
+    }
+
+    // Fallback if not found
+    console.warn('Could not find API key from script tag');
+    return null;
+  }
   // Add viewport meta tag if not present
   if (!document.querySelector('meta[name="viewport"]')) {
     const viewportMeta = document.createElement('meta');
@@ -75,16 +92,43 @@ if (import.meta.env.PROD) {
 
   logger.info("Chat button and window created");
 
+  // Token storage (retrieved from server)
+  let authToken = null;
+  // Replace this with your public API key (which should be safe to expose)
+  const PUBLIC_API_KEY = getApiKey();
+
+  // Function to retrieve the short-lived token from your server
+  function getAuthToken() {
+    logger.info("Requesting auth token...");
+    return fetch("http://localhost:3000/api/token", {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Api-Key": PUBLIC_API_KEY,
+      },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.data.token) {
+          authToken = data.data.token;
+          logger.info("Received auth token:", authToken);
+        } else {
+          logger.error("Failed to retrieve auth token:", data.error);
+        }
+      })
+      .catch((err) => {
+        logger.error("Error fetching auth token:", err);
+      });
+  }
+
   // Toggle chat window visibility
   let isOpen = false;
-
   function isMobile() {
     return window.innerWidth < 768;
   }
-
   function toggleChat() {
     logger.info("Toggling chat window, current state:", isOpen);
-
     if (!isOpen) {
       chatWindow.style.display = "block";
       chatWindow.classList.add("chat-show");
@@ -95,7 +139,6 @@ if (import.meta.env.PROD) {
         document.documentElement.classList.add("chat-open");
         document.body.classList.add("chat-open");
         document.body.style.overflow = "hidden"; // Prevent background scrolling
-
         // Force repaint to ensure full screen on mobile
         setTimeout(() => {
           window.scrollTo(0, 0);
@@ -106,7 +149,6 @@ if (import.meta.env.PROD) {
     } else {
       chatWindow.classList.remove("chat-show");
       chatWindow.classList.add("chat-hide");
-
       chatWindow.addEventListener(
         "animationend",
         () => {
@@ -116,22 +158,19 @@ if (import.meta.env.PROD) {
           document.body.classList.remove("chat-open");
           document.body.style.overflow = ""; // Restore scrolling
         },
-        { once: true },
+        { once: true }
       );
     }
   }
-
   chatButton.addEventListener("click", toggleChat);
 
   // Handle window resize events to adjust for orientation changes
-  window.addEventListener('resize', () => {
+  window.addEventListener("resize", () => {
     if (isOpen) {
-      // Recalculate heights and positions
       const chatBody = document.getElementById("chat-body");
       if (chatBody) {
-        // This will trigger height recalculation
         chatBody.style.height = isMobile()
-          ? 'calc(100% - 120px)'
+          ? "calc(100% - 120px)"
           : `calc(100% - clamp(120px, 25vh, 140px))`;
       }
     }
@@ -140,9 +179,22 @@ if (import.meta.env.PROD) {
   // Function to load the chat interface from the backend
   function loadChatInterface() {
     logger.info("Loading chat interface...");
+    // First, ensure we have a token. If not, get one.
+    if (!authToken) {
+      getAuthToken().then(() => {
+        if (authToken) callChatInit();
+      });
+    } else {
+      callChatInit();
+    }
+  }
+
+  // Call the chat init endpoint with the token in the Authorization header
+  function callChatInit() {
     fetch("http://localhost:3000/api/chat/init", {
       method: "GET",
       credentials: "include",
+      headers: { "Authorization": `Bearer ${authToken}` },
     })
       .then((response) => {
         logger.info("Chat init API response received");
@@ -192,7 +244,6 @@ if (import.meta.env.PROD) {
             appendServerMessage(msg);
           });
         } else {
-          // Fallback welcome text if no messages were returned
           appendServerMessage({
             type: "text",
             content: "Hi! How can I help you today?",
@@ -221,8 +272,6 @@ if (import.meta.env.PROD) {
     const chatBody = document.getElementById("chat-body");
     const messageDiv = document.createElement("div");
     messageDiv.className = "message server-message";
-
-    // Enhanced product card rendering
     switch (msg.type) {
       case "text":
         messageDiv.innerHTML = `
@@ -232,15 +281,15 @@ if (import.meta.env.PROD) {
           `;
         break;
       case "product":
-        // Create a more detailed product card with rating and pricing
-        const discount = msg.originalPrice ? Math.round(((msg.originalPrice - msg.price) / msg.originalPrice) * 100) : 0;
-        const ratingStars = msg.rating ? generateRatingStars(msg.rating) : '';
-
+        const discount = msg.originalPrice
+          ? Math.round(((msg.originalPrice - msg.price) / msg.originalPrice) * 100)
+          : 0;
+        const ratingStars = msg.rating ? generateRatingStars(msg.rating) : "";
         messageDiv.innerHTML = `
             <div class="product-card">
               <div class="product-image-container">
                 <img src="${msg.imageUrl}" alt="${msg.title}" loading="lazy" />
-                ${discount > 0 ? `<div class="discount-badge">-${discount}%</div>` : ''}
+                ${discount > 0 ? `<div class="discount-badge">-${discount}%</div>` : ""}
               </div>
               <div class="product-details">
                 <h4>${msg.title}</h4>
@@ -248,10 +297,10 @@ if (import.meta.env.PROD) {
                 <p>${msg.description}</p>
                 <div class="product-price">
                   <strong>${formatPrice(msg.price)}</strong>
-                  ${msg.originalPrice ? `<span class="original-price">${formatPrice(msg.originalPrice)}</span>` : ''}
+                  ${msg.originalPrice ? `<span class="original-price">${formatPrice(msg.originalPrice)}</span>` : ""}
                 </div>
-                ${msg.shipping ? `<div class="shipping-info">${msg.shipping}</div>` : ''}
-                ${msg.inStock === false ? `<div class="out-of-stock">Out of Stock</div>` : ''}
+                ${msg.shipping ? `<div class="shipping-info">${msg.shipping}</div>` : ""}
+                ${msg.inStock === false ? `<div class="out-of-stock">Out of Stock</div>` : ""}
               </div>
               <div class="product-actions">
                 ${msg.actions
@@ -261,7 +310,7 @@ if (import.meta.env.PROD) {
                   ? `<a href="${action.url}" class="product-action-button" data-action="${action.value}">${action.label}</a>`
                   : `<button class="product-action-button" data-action="${action.value}">${action.label}</button>`
                 }
-                `,
+                `
             )
             .join("")}
               </div>
@@ -276,7 +325,7 @@ if (import.meta.env.PROD) {
               ${msg.options
             .map(
               (option) =>
-                `<button class="action-button" data-action="${option.value}">${option.label}</button>`,
+                `<button class="action-button" data-action="${option.value}">${option.label}</button>`
             )
             .join("")}
             </div>
@@ -296,11 +345,7 @@ if (import.meta.env.PROD) {
     }
     chatBody.appendChild(messageDiv);
     chatBody.scrollTop = chatBody.scrollHeight;
-
-    // Set up click events on any action or product buttons within this message
-    const actionButtons = messageDiv.querySelectorAll(
-      ".action-button, .product-action-button:not(a)"
-    );
+    const actionButtons = messageDiv.querySelectorAll(".action-button, .product-action-button:not(a)");
     actionButtons.forEach((btn) => {
       btn.addEventListener("click", () => {
         const actionValue = btn.getAttribute("data-action");
@@ -311,26 +356,18 @@ if (import.meta.env.PROD) {
   }
 
   function generateRatingStars(rating) {
-    // Round rating to nearest half
     const roundedRating = Math.round(rating * 2) / 2;
-    let stars = '';
-
-    // Full stars
+    let stars = "";
     for (let i = 1; i <= Math.floor(roundedRating); i++) {
       stars += '<span class="star full">★</span>';
     }
-
-    // Half star if needed
     if (roundedRating % 1 !== 0) {
       stars += '<span class="star half">★</span>';
     }
-
-    // Empty stars
     const emptyStars = 5 - Math.ceil(roundedRating);
     for (let i = 0; i < emptyStars; i++) {
       stars += '<span class="star empty">☆</span>';
     }
-
     return `<div class="stars">${stars}</div><span class="rating-value">${rating.toFixed(1)}</span>`;
   }
 
@@ -338,13 +375,16 @@ if (import.meta.env.PROD) {
     return `$${price.toFixed(2)}`;
   }
 
-  // Move sendMessageToServer to the outer scope so it's accessible everywhere
+  // Send message to server with the token included in the Authorization header
   function sendMessageToServer(payload) {
     logger.info("Sending message payload to server:", payload);
     fetch("http://localhost:3000/api/chat/message", {
       method: "POST",
       credentials: "include",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${authToken}`,
+      },
       body: JSON.stringify(payload),
     })
       .then((response) => {
@@ -378,18 +418,12 @@ if (import.meta.env.PROD) {
     const voiceButton = document.getElementById("voice-button");
     const chatInput = document.getElementById("chat-input");
     const chatBody = document.getElementById("chat-body");
-
     logger.info("Setting up chat messaging components");
-
     let isRecording = false;
     let recognition = null;
-
-    // Sanitize input to prevent injection attacks
     function sanitizeInput(input) {
       return input.replace(/[<>]/g, "").trim();
     }
-
-    // Handle sending user messages
     function handleMessageSend() {
       const message = sanitizeInput(chatInput.value);
       if (message === "") return;
@@ -399,8 +433,6 @@ if (import.meta.env.PROD) {
       chatBody.scrollTop = chatBody.scrollHeight;
       sendMessageToServer({ message });
     }
-
-    // Append user message to chat
     function appendUserMessage(message) {
       const messageDiv = document.createElement("div");
       messageDiv.className = "message user-message";
@@ -408,8 +440,6 @@ if (import.meta.env.PROD) {
       chatBody.appendChild(messageDiv);
       logger.info("User message appended to chat");
     }
-
-    // Event listeners for send button and Enter key
     sendButton.addEventListener("click", handleMessageSend);
     chatInput.addEventListener("keyup", function (event) {
       if (event.key === "Enter" && !event.shiftKey) {
@@ -417,13 +447,8 @@ if (import.meta.env.PROD) {
         handleMessageSend();
       }
     });
-
-    // Voice recognition setup
     voiceButton.addEventListener("click", function () {
-      if (
-        !("webkitSpeechRecognition" in window) &&
-        !("SpeechRecognition" in window)
-      ) {
+      if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
         logger.warn("Speech recognition not supported in this browser");
         alert("Voice recognition is not supported in your browser.");
         return;
@@ -433,8 +458,7 @@ if (import.meta.env.PROD) {
         if (recognition) recognition.stop();
         return;
       }
-      const SpeechRecognition =
-        window.SpeechRecognition || window.webkitSpeechRecognition;
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       recognition = new SpeechRecognition();
       recognition.continuous = false;
       recognition.interimResults = true;
@@ -474,7 +498,6 @@ if (import.meta.env.PROD) {
         alert("Error starting voice recognition. Please try again.");
       }
     });
-
     chatInput.focus();
     logger.info("Chat messaging setup completed");
   }

@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "server": "bun run src/server.ts",
+    "dev:server": "NODE_ENV=development bun run src/server.ts",
+    "prod:server": "API_KEY=test123 NODE_ENV=prod bun run src/server.ts",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
