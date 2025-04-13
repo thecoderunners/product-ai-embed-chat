@@ -92,35 +92,11 @@ if (import.meta.env.PROD) {
 
   logger.info("Chat button and window created");
 
-  // Token storage (retrieved from server)
-  let authToken = null;
+  // Token storage 
+  const TOKEN = getApiKey();
+  
   // Replace this with your public API key (which should be safe to expose)
   const PUBLIC_API_KEY = getApiKey();
-
-  // Function to retrieve the short-lived token from your server
-  function getAuthToken() {
-    logger.info("Requesting auth token...");
-    return fetch("http://localhost:3000/api/token", {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Api-Key": PUBLIC_API_KEY,
-      },
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && data.data.token) {
-          authToken = data.data.token;
-          logger.info("Received auth token:", authToken);
-        } else {
-          logger.error("Failed to retrieve auth token:", data.error);
-        }
-      })
-      .catch((err) => {
-        logger.error("Error fetching auth token:", err);
-      });
-  }
 
   // Toggle chat window visibility
   let isOpen = false;
@@ -176,95 +152,61 @@ if (import.meta.env.PROD) {
     }
   });
 
-  // Function to load the chat interface from the backend
+  // Function to load the chat interface 
   function loadChatInterface() {
     logger.info("Loading chat interface...");
-    // First, ensure we have a token. If not, get one.
-    if (!authToken) {
-      getAuthToken().then(() => {
-        if (authToken) callChatInit();
-      });
-    } else {
-      callChatInit();
-    }
+    
+    // Create chat UI without initial API call
+    initChatUI();
   }
 
-  // Call the chat init endpoint with the token in the Authorization header
-  function callChatInit() {
-    fetch("http://localhost:3000/api/chat/init", {
-      method: "GET",
-      credentials: "include",
-      headers: { "Authorization": `Bearer ${authToken}` },
-    })
-      .then((response) => {
-        logger.info("Chat init API response received");
-        return response.json();
-      })
-      .then((data) => {
-        chatWindow.innerHTML = `
-          <div id="chat-header">
-            <span>Chat</span>
-            <button class="close-button" aria-label="Close chat">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-            </button>
-          </div>
-          <div id="chat-body"></div>
-          <div id="chat-footer">
-            <input type="text" id="chat-input" placeholder="Type a message..." />
-            <button id="voice-button" title="Voice Input">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-                <line x1="12" y1="19" x2="12" y2="23"></line>
-                <line x1="8" y1="23" x2="16" y2="23"></line>
-              </svg>
-            </button>
-            <button id="send-message">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="22" y1="2" x2="11" y2="13"></line>
-                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-              </svg>
-            </button>
-          </div>
-        `;
+  // Initialize the chat UI
+  function initChatUI() {
+    chatWindow.innerHTML = `
+      <div id="chat-header">
+        <span>Chat</span>
+        <button class="close-button" aria-label="Close chat">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div id="chat-body"></div>
+      <div id="chat-footer">
+        <input type="text" id="chat-input" placeholder="Type a message..." />
+        <button id="voice-button" title="Voice Input">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+            <line x1="12" y1="19" x2="12" y2="23"></line>
+            <line x1="8" y1="23" x2="16" y2="23"></line>
+          </svg>
+        </button>
+        <button id="send-message">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </div>
+    `;
 
-        // Close button functionality
-        const closeButton = chatWindow.querySelector(".close-button");
-        closeButton.addEventListener("click", (e) => {
-          e.stopPropagation();
-          toggleChat();
-        });
+    // Close button functionality
+    const closeButton = chatWindow.querySelector(".close-button");
+    closeButton.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleChat();
+    });
 
-        // Render initial messages if provided
-        if (data.messages && Array.isArray(data.messages)) {
-          data.messages.forEach((msg) => {
-            appendServerMessage(msg);
-          });
-        } else {
-          appendServerMessage({
-            type: "text",
-            content: "Hi! How can I help you today?",
-          });
-        }
-        setupChatMessaging();
-        logger.info("Chat interface loaded and initialized");
-      })
-      .catch((err) => {
-        logger.error("Error loading chat interface:", err);
-        chatWindow.innerHTML = `
-          <div class="error-state" style="padding:20px; text-align:center; color:#ff4757;">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="8" x2="12" y2="12"></line>
-              <line x1="12" y1="16" x2="12.01" y2="16"></line>
-            </svg>
-            <p>Unable to load chat. Please try again later.</p>
-          </div>
-        `;
-      });
+    // Add initial welcome message
+    appendServerMessage({
+      type: "text",
+      content: "Hi! How can I help you today?",
+    });
+    
+    setupChatMessaging();
+    logger.info("Chat interface loaded and initialized");
   }
 
   // Helper function to render server messages based on type
@@ -341,7 +283,7 @@ if (import.meta.env.PROD) {
         `;
         break;
       default:
-        messageDiv.innerHTML = `<div class="message-content">Unknown message type.</div>`;
+        messageDiv.innerHTML = `<div class="message-content">${msg}</div>`;
     }
     chatBody.appendChild(messageDiv);
     chatBody.scrollTop = chatBody.scrollHeight;
@@ -375,17 +317,30 @@ if (import.meta.env.PROD) {
     return `$${price.toFixed(2)}`;
   }
 
-  // Send message to server with the token included in the Authorization header
+  // Send message to server with the token included in the request body
   function sendMessageToServer(payload) {
     logger.info("Sending message payload to server:", payload);
-    fetch("http://localhost:3000/api/chat/message", {
+
+    // Generate a unique user identifier if we don't have one yet
+    if (!window.chatUserIdentifier) {
+      window.chatUserIdentifier = 'user-' + Math.random().toString(36).substring(2, 15);
+      logger.info("Generated user identifier:", window.chatUserIdentifier);
+    }
+
+    // Format the request according to the curl command
+    const requestBody = {
+      token: PUBLIC_API_KEY, // Use the API key from the script tag
+      message: payload.message,
+      userIdentifier: window.chatUserIdentifier
+    };
+
+    fetch("http://localhost:5173/api/chat", {
       method: "POST",
-      credentials: "include",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${authToken}`,
+        "Origin": "http://localhost:8080" // Fixed: removed extra parenthesis
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(requestBody),
     })
       .then((response) => {
         logger.info("Server response received");
@@ -393,12 +348,32 @@ if (import.meta.env.PROD) {
       })
       .then((data) => {
         logger.info("Processing server response:", data);
-        const chatBody = document.getElementById("chat-body");
-        if (data.messages && Array.isArray(data.messages)) {
+        
+        // Handle the response format from the curl example
+        if (data.success && data.message) {
+          // Convert the markdown response to HTML (basic conversion)
+          const messageContent = data.message.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                                           .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                                           .replace(/\n/g, '<br>');
+          
+          appendServerMessage({
+            type: "text",
+            content: messageContent
+          });
+        } else if (data.messages && Array.isArray(data.messages)) {
+          // Handle original format if server responds that way
           data.messages.forEach((msg) => {
             appendServerMessage(msg);
           });
+        } else {
+          // Fallback for unexpected response format
+          appendServerMessage({
+            type: "text",
+            content: "Received response from server but in an unexpected format."
+          });
         }
+        
+        const chatBody = document.getElementById("chat-body");
         chatBody.scrollTop = chatBody.scrollHeight;
       })
       .catch((err) => {
