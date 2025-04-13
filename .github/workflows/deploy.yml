@@ -48,10 +48,17 @@ jobs:
       - name: Add .nojekyll file
         run: touch dist/.nojekyll
 
+      # Add a timestamp file to force a new commit
+      - name: Create timestamp file to force commit
+        run: |
+          echo "Build timestamp: $(date)" > dist/build-timestamp.txt
+
       - name: Deploy to GitHub Pages 🚀
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           folder: dist
           clean: true
+          force: true # Force push the commit
           clean-exclude: |
             .nojekyll
+            CNAME
