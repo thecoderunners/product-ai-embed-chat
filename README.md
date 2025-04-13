@@ -208,7 +208,7 @@ Add this script tag to any HTML page where you want to include the chat widget:
 ```html
 <script
   type="module"
-  src="https://thecoderunners.github.io/embed-chat/chat-widget.min.js"
+  src="https://thecoderunners.github.io/product-ai-embed-chat/chat-widget.min.js"
   data-api-key="YOUR_API_KEY"
 ></script>
 ```
