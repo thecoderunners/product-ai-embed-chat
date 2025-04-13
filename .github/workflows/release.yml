@@ -1,37 +1,54 @@
-name: Release
+name: Build and Deploy to GitHub Pages
 
 on:
   push:
-    tags:
-      - "v*.*.*"
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout 🛎️
+        uses: actions/checkout@v3
 
-      - name: Use Node.js 18.x
+      - name: Setup Node.js ⚙️
         uses: actions/setup-node@v3
         with:
-          node-version: "18.x"
+          node-version: "18"
 
-      - run: npm install
-      - run: npm run build
-
-      - name: Create Release
-        id: create_release
-        uses: ncipollo/release-action@v1
+      - name: Setup pnpm 📦
+        uses: pnpm/action-setup@v2
         with:
-          tag: ${{ github.ref }}
+          version: 8
+          run_install: false
 
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v3
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./dist/chat-widget.min.js
-          asset_name: chat-widget.min.js
-          asset_content_type: application/javascript
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies 🔧
+        run: pnpm install
+
+      - name: Build 🏗️
+        run: pnpm run build
+
+      - name: Deploy to GitHub Pages 🚀
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: dist
+          clean: true
+          clean-exclude: |
+            .nojekyll

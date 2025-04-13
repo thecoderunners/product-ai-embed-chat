@@ -1,7 +1,8 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
-
 export default defineConfig({
+    // Base path for GitHub Pages - this is crucial for correct asset URLs
+    base: '/product-ai-embed-chat/',
     build: {
         minify: 'esbuild',
         cssCodeSplit: false,

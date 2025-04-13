@@ -163,3 +163,91 @@ Authorization: Bearer <short-lived-token>
 
 5. Origin/Referer Validation:
    Where possible, check the origin or referer headers to further restrict access to your API endpoints, although this should only serve as an additional layer of security.
+
+# Embedded Chat Widget Deployment Guide
+
+This guide explains how to deploy your chat widget to GitHub Pages using the provided workflow and configuration.
+
+## Deployment Setup
+
+### 1. Update Your Vite Configuration
+
+1. Replace or update your `vite.config.js` with the provided configuration
+2. The key addition is `base: '/product-ai-embed-chat/'` which ensures all assets are correctly referenced
+
+### 2. Add the GitHub Action Workflow
+
+1. Create a directory in your repository: `.github/workflows/`
+2. Add the provided workflow file as `.github/workflows/deploy.yml`
+
+### 3. Push to GitHub
+
+1. Commit these changes to your repository
+2. Push to the `main` branch of your `thecoderunners/product-ai-embed-chat` repository
+3. The GitHub Action will automatically build and deploy your widget
+
+### 4. Enable GitHub Pages
+
+1. Go to your repository settings on GitHub
+2. Navigate to "Pages" in the sidebar
+3. Under "Build and deployment", select "GitHub Actions" as the source
+4. This should be done automatically by the workflow, but it's good to verify
+
+## Using Your Deployed Widget
+
+Once deployed, your chat widget will be available at:
+
+```
+https://thecoderunners.github.io/embed-chat/chat-widget.min.js
+```
+
+### Implementation Example
+
+Add this script tag to any HTML page where you want to include the chat widget:
+
+```html
+<script
+  type="module"
+  src="https://thecoderunners.github.io/embed-chat/chat-widget.min.js"
+  data-api-key="YOUR_API_KEY"
+></script>
+```
+
+Replace `YOUR_API_KEY` with your actual API key.
+
+## Verifying Deployment
+
+To verify that your widget has been deployed correctly:
+
+1. Visit `https://thecoderunners.github.io/embed-chat/chat-widget.min.js` directly in your browser - you should see the minified JavaScript code
+2. Create a test HTML page using the implementation example and make sure the chat widget appears
+3. Check the browser console for any errors related to loading the widget
+
+## Troubleshooting
+
+### Widget Not Loading
+
+If the widget doesn't load, check:
+
+1. The browser console for errors
+2. That GitHub Pages is enabled for your repository
+3. That the workflow ran successfully (check the Actions tab in your repository)
+4. That the base path in your Vite config matches your repository name
+
+### API Connection Issues
+
+If the widget loads but can't connect to your API:
+
+1. Verify that your API server is running
+2. Check for CORS issues - ensure your API allows requests from the GitHub Pages domain
+3. Verify that the correct API endpoint is configured in your code
+
+## Updating the Widget
+
+To update your widget:
+
+1. Make your changes to the code
+2. Commit and push to the main branch
+3. The GitHub Action will automatically rebuild and redeploy
+
+The updated widget will be available at the same URL, but you may need to clear your browser cache to see the changes immediately.
