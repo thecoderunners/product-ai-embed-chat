@@ -4,6 +4,43 @@
     sans-serif;
 }
 
+/* Screen reader only content */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* Focus management and keyboard navigation */
+*:focus {
+  outline: 2px solid #6c5ce7;
+  outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  #my-chat-widget {
+    filter: contrast(150%);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /* Chat Toggle Button */
 #my-chat-widget button.chat-toggle {
   background: #6c5ce7;
@@ -177,10 +214,21 @@
   padding: clamp(16px, 5vw, 20px);
   font-size: clamp(16px, 4vw, 18px);
   font-weight: 600;
-  text-align: center;
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+#chat-title {
+  margin: 0;
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 @media (max-width: 767px) {
@@ -194,7 +242,8 @@
   }
 }
 
-.close-button {
+.close-button,
+.sound-toggle {
   background: none;
   border: none;
   color: white;
@@ -204,16 +253,39 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  transition: background-color 0.2s;
+  transition: background-color 0.2s, transform 0.1s;
+  min-width: 36px;
+  min-height: 36px;
 }
 
-.close-button:hover {
+.close-button:hover,
+.sound-toggle:hover {
   background: rgba(255, 255, 255, 0.1);
+  transform: scale(1.05);
+}
+
+.close-button:active,
+.sound-toggle:active {
+  transform: scale(0.95);
 }
 
 .close-button svg {
   width: clamp(18px, 5vw, 20px);
   height: clamp(18px, 5vw, 20px);
+}
+
+.sound-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Sound toggle specific styles */
+.sound-toggle {
+  opacity: 0.8;
+}
+
+.sound-toggle:hover {
+  opacity: 1;
 }
 
 /* Chat Body */
@@ -238,9 +310,11 @@
 /* Message Styling */
 .message {
   display: flex;
+  flex-direction: column;
   margin-bottom: 16px;
   animation: messageFadeIn 0.3s ease forwards;
   opacity: 0;
+  gap: 4px;
 }
 
 @keyframes messageFadeIn {
@@ -275,13 +349,127 @@
 }
 
 .user-message {
-  justify-content: flex-end;
+  align-items: flex-end;
+}
+
+.user-message .message-content {
+  order: 1;
+}
+
+.user-message .message-timestamp {
+  order: 2;
+  text-align: right;
 }
 
 .user-message .message-content {
   background: #6c5ce7;
   color: #ffffff;
   border-bottom-right-radius: 4px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* Message Status Indicators */
+.message-status {
+  flex-shrink: 0;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+  margin-left: 8px;
+  align-self: flex-end;
+}
+
+.message-status[data-status="sending"] {
+  animation: spin 1s linear infinite;
+}
+
+.message-status[data-status="sent"] {
+  opacity: 0.8;
+}
+
+.message-status[data-status="error"] {
+  opacity: 1;
+  color: #ff6b6b;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Typing Indicator */
+.typing-indicator {
+  opacity: 0.8;
+}
+
+.typing-dots {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.typing-dots span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #6c5ce7;
+  animation: typingDots 1.4s ease-in-out infinite;
+}
+
+.typing-dots span:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.typing-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typingDots {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-10px);
+    opacity: 1;
+  }
+}
+
+/* Message Timestamps */
+.message-timestamp {
+  font-size: 11px;
+  color: rgba(0, 0, 0, 0.5);
+  margin-top: 2px;
+  font-weight: 400;
+  user-select: none;
+  pointer-events: none;
+}
+
+.user-message .message-timestamp {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+@media (max-width: 767px) {
+  .message-timestamp {
+    font-size: 10px;
+  }
+}
+
+/* Dark mode timestamp colors */
+@media (prefers-color-scheme: dark) {
+  .message-timestamp {
+    color: rgba(255, 255, 255, 0.5);
+  }
+  
+  .user-message .message-timestamp {
+    color: rgba(255, 255, 255, 0.7);
+  }
 }
 
 /* Chat Footer */
