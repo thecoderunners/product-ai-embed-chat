@@ -1,5 +1,5 @@
 // src/script.js
-if (import.meta.env.PROD) {
+if (import.meta.env && import.meta.env.PROD) {
   // In production, import CSS as a raw string and inject it manually.
   import('./styles.css?inline').then((module) => {
     const cssText = module.default;
@@ -7,9 +7,19 @@ if (import.meta.env.PROD) {
     style.textContent = cssText;
     document.head.appendChild(style);
   });
-} else {
-  // In development, import normally so that Vite handles injection (and HMR) for you.
+} else if (import.meta.env && import.meta.env.DEV) {
+  // In Vite dev environment, import normally so that Vite handles injection (and HMR) for you.
   import('./styles.css');
+} else {
+  // When not using Vite (direct file access), fetch and inject CSS manually
+  fetch('/src/styles.css')
+    .then(response => response.text())
+    .then(cssText => {
+      const style = document.createElement('style');
+      style.textContent = cssText;
+      document.head.appendChild(style);
+    })
+    .catch(err => console.warn('Could not load styles:', err));
 }
 
 
@@ -94,7 +104,7 @@ if (import.meta.env.PROD) {
 
   // Token storage 
   const TOKEN = getApiKey();
-  
+
   // Replace this with your public API key (which should be safe to expose)
   const PUBLIC_API_KEY = getApiKey();
 
@@ -155,7 +165,7 @@ if (import.meta.env.PROD) {
   // Function to load the chat interface 
   function loadChatInterface() {
     logger.info("Loading chat interface...");
-    
+
     // Create chat UI without initial API call
     initChatUI();
   }
@@ -204,7 +214,7 @@ if (import.meta.env.PROD) {
       type: "text",
       content: "Hi! How can I help you today?",
     });
-    
+
     setupChatMessaging();
     logger.info("Chat interface loaded and initialized");
   }
@@ -343,19 +353,29 @@ if (import.meta.env.PROD) {
       body: JSON.stringify(requestBody),
     })
       .then((response) => {
-        logger.info("Server response received");
+        logger.info("Server response received", response.status);
+
+        // Handle non-200 status codes
+        if (!response.ok) {
+          return response.json().then(errorData => {
+            throw new Error(JSON.stringify({ status: response.status, data: errorData }));
+          }).catch(() => {
+            throw new Error(JSON.stringify({ status: response.status, data: { error: 'Unknown error' } }));
+          });
+        }
+
         return response.json();
       })
       .then((data) => {
         logger.info("Processing server response:", data);
-        
+
         // Handle the response format from the curl example
         if (data.success && data.message) {
           // Convert the markdown response to HTML (basic conversion)
           const messageContent = data.message.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                                           .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                                           .replace(/\n/g, '<br>');
-          
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/\n/g, '<br>');
+
           appendServerMessage({
             type: "text",
             content: messageContent
@@ -372,16 +392,47 @@ if (import.meta.env.PROD) {
             content: "Received response from server but in an unexpected format."
           });
         }
-        
+
         const chatBody = document.getElementById("chat-body");
         chatBody.scrollTop = chatBody.scrollHeight;
       })
       .catch((err) => {
         logger.error("Error in server communication:", err);
         const chatBody = document.getElementById("chat-body");
+
+        let errorMessage = "Sorry, I couldn't process your message. Please try again.";
+
+        // Handle specific error responses
+        try {
+          const errorInfo = JSON.parse(err.message);
+          if (errorInfo.status === 401) {
+            const errorData = errorInfo.data;
+            if (errorData && errorData.error) {
+              if (errorData.error.includes('Invalid API token') || errorData.error.includes('unauthorized')) {
+                errorMessage = "🔒 Authentication failed. Please check your API key configuration.";
+              } else {
+                errorMessage = `❌ Authentication error: ${errorData.error}`;
+              }
+            } else {
+              errorMessage = "🔒 Unauthorized access. Please check your API key.";
+            }
+          } else if (errorInfo.status === 403) {
+            errorMessage = "🚫 Access forbidden. Please check your permissions.";
+          } else if (errorInfo.status === 500) {
+            errorMessage = "⚠️ Server error. Please try again later.";
+          } else if (errorInfo.data && errorInfo.data.error) {
+            errorMessage = `❌ Error: ${errorInfo.data.error}`;
+          }
+        } catch (parseErr) {
+          // If error parsing fails, use the original error message or default
+          if (err.message && !err.message.includes('fetch')) {
+            errorMessage = `❌ ${err.message}`;
+          }
+        }
+
         appendServerMessage({
           type: "text",
-          content: "Sorry, I couldn't process your message. Please try again.",
+          content: errorMessage,
         });
         chatBody.scrollTop = chatBody.scrollHeight;
       });
